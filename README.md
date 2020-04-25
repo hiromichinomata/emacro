@@ -24,5 +24,5 @@ $ emacro '^S,user^D^D' test/sample.csv
 * `^a` => `M-a`
 
 ## TODO
-[ ] implementation
-[ ] how to install
+* [ ] implementation
+* [ ] how to install
