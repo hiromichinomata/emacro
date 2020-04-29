@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -12,7 +14,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "[usage] %s macro filename", os.Args[0])
 		os.Exit(1)
 	}
-	// macro := os.Args[1]
+	macro := os.Args[1]
 	filename := os.Args[2]
 	file, err := os.Open(filename)
 	if err != nil {
@@ -22,7 +24,17 @@ func main() {
 
 	b, err := ioutil.ReadAll(file)
 	fileContent := string(b)
-	fmt.Println(fileContent)
+	result := ""
+	result = convert(macro, fileContent)
+	fmt.Println(result)
+}
 
-	// fmt.Println("macro: " + macro)
+func convert(macro string, contents string) string {
+	result := ""
+	scanner := bufio.NewScanner(strings.NewReader(contents))
+	for scanner.Scan() {
+		line := scanner.Text()
+		result += line + "\n"
+	}
+	return result
 }
