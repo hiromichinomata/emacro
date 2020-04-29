@@ -44,6 +44,12 @@ func convert(macro string, contents string) string {
 				case "^A":
 					index = 0
 					i += 1
+				case "^B":
+					index -= 1
+					if index < 0 {
+						index = 0
+					}
+					i += 1
 				case "^D":
 					if index < len(line)-1 {
 						line = line[:index] + line[index+1:]
@@ -53,6 +59,11 @@ func convert(macro string, contents string) string {
 					i += 1
 				case "^E":
 					index = len(line)
+					i += 1
+				case "^F":
+					if index < len(line) {
+						index += 1
+					}
 					i += 1
 				}
 			}
