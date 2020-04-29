@@ -44,6 +44,9 @@ func convert(macro string, contents string) string {
 				case "^A":
 					index = 0
 					i += 1
+				case "^E":
+					index = len(line)
+					i += 1
 				}
 			}
 		}
