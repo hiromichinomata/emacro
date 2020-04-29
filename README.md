@@ -38,6 +38,6 @@ Supported operations
 To input `^`, you can use `^^`
 
 ## TODO
-* [ ] more operation
+* [ ] more operations
 * [ ] how to install
 * [ ] test
