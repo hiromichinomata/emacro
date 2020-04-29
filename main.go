@@ -34,6 +34,13 @@ func convert(macro string, contents string) string {
 	scanner := bufio.NewScanner(strings.NewReader(contents))
 	for scanner.Scan() {
 		line := scanner.Text()
+		index := 0
+		for i := 0; i < len(macro); i++ {
+			if string(macro[i]) != "^" {
+				line = line[:index] + string(macro[i]) + line[index:]
+				index += 1
+			}
+		}
 		result += line + "\n"
 	}
 	return result
