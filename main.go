@@ -65,6 +65,8 @@ func convert(macro string, contents string) string {
 						index += 1
 					}
 					i += 1
+				case "^N":
+					i += 1
 				case "^S":
 					searchWord := ""
 					for j := i + 2; j < len(macro); j++ {
