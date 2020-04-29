@@ -65,6 +65,22 @@ func convert(macro string, contents string) string {
 						index += 1
 					}
 					i += 1
+				case "^S":
+					searchWord := ""
+					for j := i + 2; j < len(macro); j++ {
+						if string(macro[j]) != "^" {
+							searchWord += string(macro[j])
+						} else {
+							break
+						}
+					}
+					pos := strings.Index(line[index:], searchWord)
+					if pos != -1 {
+						index += pos + len(searchWord)
+						i += len(searchWord) + 1
+					} else {
+						i += 1
+					}
 				}
 			}
 		}
