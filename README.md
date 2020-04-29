@@ -20,9 +20,24 @@ $ emacro '^S,user^D^D' test/sample.csv
 ```
 
 ## Doc
+Basic
+
 * `^A` => `C-a`
 * `^a` => `M-a`
 
+Supported operations
+
+* `C-a`
+* `C-b`
+* `C-d`
+* `C-e`
+* `C-f`
+* `C-n`
+* `C-s`
+
+To input `^`, you can use `^^`
+
 ## TODO
-* [ ] implementation
+* [ ] more operation
 * [ ] how to install
+* [ ] test
