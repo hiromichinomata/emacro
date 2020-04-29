@@ -41,6 +41,9 @@ func convert(macro string, contents string) string {
 				index += 1
 			} else {
 				switch macro[i : i+2] {
+				case "^^":
+					line = line[:index] + "^" + line[index:]
+					i += 1
 				case "^A":
 					index = 0
 					i += 1
