@@ -1,6 +1,8 @@
 # emacro
 
-Use Emacs-style key sequences to transform each line of a file, similar in spirit to using `grep` for line-oriented workflows.
+Transform each line of a file with Emacs-style key sequences—useful for quick line-oriented edits in the same way you might use `grep` for line-oriented **filtering**.
+
+The macro language supports movement, search, line/word editing, and literal insertion. Processing is **one line at a time**; the cursor is **byte-based** (ASCII / UTF-8 multibyte lines are not fully “character-aware” for all operations).
 
 ## Requirements
 
@@ -14,13 +16,19 @@ From a clone of this repository:
 go build -o emacro .
 ```
 
-To put the binary on your `GOPATH` / `GOBIN` (from the module root):
+To install the binary onto your `PATH` (from the module root):
 
 ```console
 go install
 ```
 
-If you publish the module under a full path (for example `github.com/yourname/emacro`), you can install a tagged version with `go install github.com/yourname/emacro@latest` after updating `go.mod`’s `module` line.
+If the module is published under a full import path (for example `github.com/yourname/emacro`), you can also use:
+
+```console
+go install github.com/yourname/emacro@latest
+```
+
+(after setting the `module` line in `go.mod` to match that path).
 
 ## Usage
 
@@ -28,9 +36,9 @@ If you publish the module under a full path (for example `github.com/yourname/em
 emacro <macro> <file> [file...]
 ```
 
-- **Multiple files:** each file is read in order; transformed output is printed in the same order (no filename headers).
-- **Standard input:** use `-` as a file name to read from stdin.
-- **Help:** `emacro -h` (or `--help`).
+- **Multiple files:** read in order; output is the concatenation of each file’s transformed lines (no filename headers).
+- **Standard input:** use `-` as a file name.
+- **Help:** `emacro -h` or `emacro --help`.
 
 ### Example
 
@@ -56,32 +64,45 @@ $ cat test/sample.csv | emacro '^S,user^D^D' -
 2020-04-01 03:45,user,male,37
 ```
 
-## Macro syntax
+## Macro reference
 
-Control characters are written with a leading `^` and an **uppercase** letter, matching the supported operations below.
+### Control (two bytes: `^` + letter)
 
-- `^A` — `C-a` (beginning of line)
-- `^B` — `C-b` (backward one character)
-- `^D` — `C-d` (delete character under cursor)
-- `^E` — `C-e` (end of line)
-- `^F` — `C-f` (forward one character)
-- `^K` — `C-k` (kill line: delete from the cursor through end of line)
-- `^N` — `C-n` (no-op in this tool; line breaks are handled by the line reader)
-- `^S` — `C-s` (search forward for the following text; the search term runs up to the next `^` or end of macro)
-- `^R` — `C-r` (search backward: moves the cursor to the start of the **last** occurrence of the term before the current position; same term delimiter rules as `^S`)
-- `^^` — a literal `^` (caret)
+| Sequence | Binding | Effect |
+|----------|---------|--------|
+| `^A` | `C-a` | Move to beginning of line |
+| `^B` | `C-b` | Move backward one character |
+| `^D` | `C-d` | Delete character under cursor (or one before end of line) |
+| `^E` | `C-e` | Move to end of line |
+| `^F` | `C-f` | Move forward one character |
+| `^K` | `C-k` | Kill line: delete from cursor through end of line |
+| `^N` | `C-n` | No-op (each line is processed separately) |
+| `^S` | `C-s` | Forward search: move cursor **past** the next match (see below) |
+| `^R` | `C-r` | Backward search: move cursor to the **start** of the last match **before** the current position (see below) |
+| `^^` | — | Insert a literal `^` |
 
-To type a single `^` in the output, use `^^` at the cursor.
+Any other character is **inserted** at the cursor; the cursor advances one byte.
 
-Meta key bindings use a three-character spell-out (lowercase `m` plus the command letter):
+### Search terms (`^S` / `^R`)
 
-- `^mf` — `M-f` (forward one word: move past non-word bytes, then past the next word; cursor lands after that word)
-- `^mb` — `M-b` (backward one word)
-- `^md` — `M-d` (`kill-word`: delete from the cursor through the end of the next word)
+The search string begins **after** `^S` or `^R` and ends at the **next `^`** in the macro, or at end of macro. To avoid swallowing the rest of the macro (for example before inserting text), **terminate the term with a harmless command** such as `^N` before further letters—e.g. `^E^R,user^NX` if you need a literal `X` after a `^R,user` search.
 
-Here a **word** is a run of ASCII letters, digits, or `_`.
+If the search **fails**, the engine only advances the macro by one step (same idea as the original `^S` behavior), so the following bytes may be interpreted differently than after a successful search.
 
-Any other character in the macro is **inserted** at the current cursor position, and the cursor moves forward by one byte (same as the original implementation’s byte-oriented model).
+### Meta (three bytes: `^` + `m` + letter)
+
+| Sequence | Binding | Effect |
+|----------|---------|--------|
+| `^mf` | `M-f` | Forward one **word** |
+| `^mb` | `M-b` | Backward one **word** |
+| `^md` | `M-d` | Kill **forward** from cursor through end of next word |
+
+A **word** is a maximal run of ASCII letters, digits, or `_`.
+
+### Notes
+
+- Unknown two-byte sequences like `^Z` advance by one byte in the macro stream (the `^` is skipped in that step).
+- Multibyte UTF-8 characters are easiest to reason about when lines stay ASCII; byte indexing can split Unicode code points.
 
 ## Development
 
@@ -89,9 +110,4 @@ Any other character in the macro is **inserted** at the current cursor position,
 go test ./...
 ```
 
-CI runs `go test` on push and pull request (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
-
-## TODO
-
-- [ ] More operations (e.g. additional Emacs key bindings)
-- [ ] Smoother install story once the module is published under a stable `go install` path
+CI runs `go test` on push and pull request ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
