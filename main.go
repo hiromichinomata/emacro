@@ -1,31 +1,44 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 func main() {
-	argsCount := len(os.Args) - 1
-	if argsCount < 2 {
-		fmt.Fprintf(os.Stderr, "[usage] %s macro filename\n", os.Args[0])
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s <macro> <file> [file...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  Use \"-\" as a file to read from standard input.\n")
+	}
+	flag.Parse()
+	args := flag.Args()
+	if len(args) < 2 {
+		flag.Usage()
 		os.Exit(1)
 	}
-	macro := os.Args[1]
-	filename := os.Args[2]
-	file, err := os.Open(filename)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "open %s: %v\n", filename, err)
-		os.Exit(1)
+	macro := args[0]
+	var b strings.Builder
+	for _, path := range args[1:] {
+		var content string
+		if path == "-" {
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "read stdin: %v\n", err)
+				os.Exit(1)
+			}
+			content = string(data)
+		} else {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "open %s: %v\n", path, err)
+				os.Exit(1)
+			}
+			content = string(data)
+		}
+		b.WriteString(convert(macro, content))
 	}
-	defer file.Close()
-
-	b, err := io.ReadAll(file)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "read %s: %v\n", filename, err)
-		os.Exit(1)
-	}
-	fileContent := string(b)
-	fmt.Println(convert(macro, fileContent))
+	fmt.Println(b.String())
 }
