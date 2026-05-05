@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 )
@@ -22,7 +22,7 @@ func main() {
 	}
 	defer file.Close()
 
-	b, err := ioutil.ReadAll(file)
+	b, err := io.ReadAll(file)
 	fileContent := string(b)
 	result := ""
 	result = convert(macro, fileContent)
