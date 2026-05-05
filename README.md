@@ -65,6 +65,7 @@ Control characters are written with a leading `^` and an **uppercase** letter, m
 - `^D` — `C-d` (delete character under cursor)
 - `^E` — `C-e` (end of line)
 - `^F` — `C-f` (forward one character)
+- `^K` — `C-k` (kill line: delete from the cursor through end of line)
 - `^N` — `C-n` (no-op in this tool; line breaks are handled by the line reader)
 - `^S` — `C-s` (search forward for the following text; the search term runs up to the next `^` or end of macro)
 - `^R` — `C-r` (search backward: moves the cursor to the start of the **last** occurrence of the term before the current position; same term delimiter rules as `^S`)

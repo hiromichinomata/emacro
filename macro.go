@@ -46,6 +46,9 @@ func applyMacroToLine(macro, line string) string {
 					index++
 				}
 				i++
+			case "^K":
+				line = line[:index]
+				i++
 			case "^N":
 				i++
 			case "^R":

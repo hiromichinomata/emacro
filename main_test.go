@@ -48,6 +48,24 @@ func Test_convert_trailingCaret(t *testing.T) {
 	}
 }
 
+func Test_convert_killLine(t *testing.T) {
+	t.Run("fromStartClearsLine", func(t *testing.T) {
+		if got := convert("^K", "hello"); got != "\n" {
+			t.Errorf("got %q want newline-only line", got)
+		}
+	})
+	t.Run("afterForwardDeletesTail", func(t *testing.T) {
+		if got := convert("^F^F^K", "abcd"); got != "ab\n" {
+			t.Errorf("got %q want %q", got, "ab\n")
+		}
+	})
+	t.Run("atEndNoChange", func(t *testing.T) {
+		if got := convert("^E^K", "hi"); got != "hi\n" {
+			t.Errorf("got %q want %q", got, "hi\n")
+		}
+	})
+}
+
 func Test_convert_reverseSearch(t *testing.T) {
 	t.Run("cursorAtMatchStartThenInsert", func(t *testing.T) {
 		// Search term must end at the next '^' (^N is a no-op). ^E then ^R,user; point at
