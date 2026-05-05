@@ -1,95 +1,44 @@
 package main
 
 import (
-	"bufio"
+	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 )
 
 func main() {
-	argsCount := len(os.Args) - 1
-	if argsCount < 2 {
-		fmt.Fprintln(os.Stderr, "[usage] %s macro filename", os.Args[0])
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s <macro> <file> [file...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  Use \"-\" as a file to read from standard input.\n")
+	}
+	flag.Parse()
+	args := flag.Args()
+	if len(args) < 2 {
+		flag.Usage()
 		os.Exit(1)
 	}
-	macro := os.Args[1]
-	filename := os.Args[2]
-	file, err := os.Open(filename)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "file not found")
-	}
-	defer file.Close()
-
-	b, err := ioutil.ReadAll(file)
-	fileContent := string(b)
-	result := ""
-	result = convert(macro, fileContent)
-	fmt.Println(result)
-}
-
-func convert(macro string, contents string) string {
-	result := ""
-	scanner := bufio.NewScanner(strings.NewReader(contents))
-	for scanner.Scan() {
-		line := scanner.Text()
-		index := 0
-		for i := 0; i < len(macro); i++ {
-			if string(macro[i]) != "^" {
-				line = line[:index] + string(macro[i]) + line[index:]
-				index += 1
-			} else {
-				switch macro[i : i+2] {
-				case "^^":
-					line = line[:index] + "^" + line[index:]
-					i += 1
-				case "^A":
-					index = 0
-					i += 1
-				case "^B":
-					index -= 1
-					if index < 0 {
-						index = 0
-					}
-					i += 1
-				case "^D":
-					if index < len(line)-1 {
-						line = line[:index] + line[index+1:]
-					} else {
-						line = line[:index]
-					}
-					i += 1
-				case "^E":
-					index = len(line)
-					i += 1
-				case "^F":
-					if index < len(line) {
-						index += 1
-					}
-					i += 1
-				case "^N":
-					i += 1
-				case "^S":
-					searchWord := ""
-					for j := i + 2; j < len(macro); j++ {
-						if string(macro[j]) != "^" {
-							searchWord += string(macro[j])
-						} else {
-							break
-						}
-					}
-					pos := strings.Index(line[index:], searchWord)
-					if pos != -1 {
-						index += pos + len(searchWord)
-						i += len(searchWord) + 1
-					} else {
-						i += 1
-					}
-				}
+	macro := args[0]
+	var b strings.Builder
+	for _, path := range args[1:] {
+		var content string
+		if path == "-" {
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "read stdin: %v\n", err)
+				os.Exit(1)
 			}
+			content = string(data)
+		} else {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "open %s: %v\n", path, err)
+				os.Exit(1)
+			}
+			content = string(data)
 		}
-		result += line + "\n"
+		b.WriteString(convert(macro, content))
 	}
-	return result
+	fmt.Println(b.String())
 }
