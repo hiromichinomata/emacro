@@ -40,3 +40,10 @@ func Test_convert_emptyContents(t *testing.T) {
 		t.Errorf("got %q want empty", got)
 	}
 }
+
+func Test_convert_trailingCaret(t *testing.T) {
+	// lone '^' at end of macro must not panic (invalid slice)
+	if got := convert("^", "ab"); got != "ab\n" {
+		t.Errorf("got %q want %q", got, "ab\n")
+	}
+}

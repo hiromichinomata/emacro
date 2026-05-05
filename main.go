@@ -18,19 +18,22 @@ func main() {
 	filename := os.Args[2]
 	file, err := os.Open(filename)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "file not found")
+		fmt.Fprintf(os.Stderr, "open %s: %v\n", filename, err)
+		os.Exit(1)
 	}
 	defer file.Close()
 
 	b, err := io.ReadAll(file)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read %s: %v\n", filename, err)
+		os.Exit(1)
+	}
 	fileContent := string(b)
-	result := ""
-	result = convert(macro, fileContent)
-	fmt.Println(result)
+	fmt.Println(convert(macro, fileContent))
 }
 
 func convert(macro string, contents string) string {
-	result := ""
+	var b strings.Builder
 	scanner := bufio.NewScanner(strings.NewReader(contents))
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -40,6 +43,9 @@ func convert(macro string, contents string) string {
 				line = line[:index] + string(macro[i]) + line[index:]
 				index += 1
 			} else {
+				if i+1 >= len(macro) {
+					continue
+				}
 				switch macro[i : i+2] {
 				case "^^":
 					line = line[:index] + "^" + line[index:]
@@ -86,10 +92,13 @@ func convert(macro string, contents string) string {
 					} else {
 						i += 1
 					}
+				default:
+					i++
 				}
 			}
 		}
-		result += line + "\n"
+		b.WriteString(line)
+		b.WriteByte('\n')
 	}
-	return result
+	return b.String()
 }
