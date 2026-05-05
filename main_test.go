@@ -48,6 +48,31 @@ func Test_convert_trailingCaret(t *testing.T) {
 	}
 }
 
+func Test_convert_metaWord(t *testing.T) {
+	// Word characters: [A-Za-z0-9_]
+	t.Run("forwardWordThenInsert", func(t *testing.T) {
+		got := convert("^mfX", "hello world")
+		want := "helloX world\n"
+		if got != want {
+			t.Errorf("got %q want %q", got, want)
+		}
+	})
+	t.Run("backwardWordFromEOL", func(t *testing.T) {
+		got := convert("^E^mb", "hello world")
+		want := "hello world\n"
+		if got != want {
+			t.Errorf("got %q want %q", got, want)
+		}
+	})
+	t.Run("killWord", func(t *testing.T) {
+		got := convert("^md", "hello world")
+		want := " world\n"
+		if got != want {
+			t.Errorf("got %q want %q", got, " world\n")
+		}
+	})
+}
+
 func Test_convert_killLine(t *testing.T) {
 	t.Run("fromStartClearsLine", func(t *testing.T) {
 		if got := convert("^K", "hello"); got != "\n" {

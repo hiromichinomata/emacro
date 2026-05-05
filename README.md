@@ -73,6 +73,14 @@ Control characters are written with a leading `^` and an **uppercase** letter, m
 
 To type a single `^` in the output, use `^^` at the cursor.
 
+Meta key bindings use a three-character spell-out (lowercase `m` plus the command letter):
+
+- `^mf` — `M-f` (forward one word: move past non-word bytes, then past the next word; cursor lands after that word)
+- `^mb` — `M-b` (backward one word)
+- `^md` — `M-d` (`kill-word`: delete from the cursor through the end of the next word)
+
+Here a **word** is a run of ASCII letters, digits, or `_`.
+
 Any other character in the macro is **inserted** at the current cursor position, and the cursor moves forward by one byte (same as the original implementation’s byte-oriented model).
 
 ## Development

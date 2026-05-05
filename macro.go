@@ -18,6 +18,24 @@ func applyMacroToLine(macro, line string) string {
 			if i+1 >= len(macro) {
 				continue
 			}
+			// Meta: ^mf ^mb ^md (M-f / M-b / M-d); word = ASCII letters, digits, underscore.
+			if i+2 < len(macro) && macro[i+1] == 'm' {
+				switch macro[i+2] {
+				case 'f':
+					index = forwardWordEnd(line, index)
+					i += 2
+				case 'b':
+					index = backwardWordStart(line, index)
+					i += 2
+				case 'd':
+					end := forwardWordEnd(line, index)
+					line = line[:index] + line[end:]
+					i += 2
+				default:
+					i++
+				}
+				continue
+			}
 			switch macro[i : i+2] {
 			case "^^":
 				line = line[:index] + "^" + line[index:]
@@ -100,4 +118,30 @@ func convert(macro string, contents string) string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+func isWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
+}
+
+func forwardWordEnd(line string, index int) int {
+	j := index
+	for j < len(line) && !isWordByte(line[j]) {
+		j++
+	}
+	for j < len(line) && isWordByte(line[j]) {
+		j++
+	}
+	return j
+}
+
+func backwardWordStart(line string, index int) int {
+	j := index
+	for j > 0 && !isWordByte(line[j-1]) {
+		j--
+	}
+	for j > 0 && isWordByte(line[j-1]) {
+		j--
+	}
+	return j
 }
