@@ -47,3 +47,32 @@ func Test_convert_trailingCaret(t *testing.T) {
 		t.Errorf("got %q want %q", got, "ab\n")
 	}
 }
+
+func Test_convert_reverseSearch(t *testing.T) {
+	t.Run("cursorAtMatchStartThenInsert", func(t *testing.T) {
+		// Search term must end at the next '^' (^N is a no-op). ^E then ^R,user; point at
+		// start of last ",user"; then X inserts there (no comma before X — would insert literally).
+		got := convert("^E^R,user^NX", "a,user,b,user")
+		want := "a,user,bX,user\n"
+		if got != want {
+			t.Errorf("got %q want %q", got, want)
+		}
+	})
+	t.Run("lastOccurrenceBeforeCursor", func(t *testing.T) {
+		got := convert("^E^Rabc", "xxabcyyabczz")
+		// line unchanged; macro only moves cursor (no trailing edit)
+		want := "xxabcyyabczz\n"
+		if got != want {
+			t.Errorf("got %q want %q", got, want)
+		}
+	})
+	t.Run("noMatchThenContinuesMacro", func(t *testing.T) {
+		// Term ",x" ends at ^A. On failure, i++ then the for-loop i++ skips past "^R" entirely
+		// (same pattern as ^S), so the next macro byte is ',' — not a literal 'R'.
+		got := convert("^R,x^A", "abc")
+		want := ",xabc\n"
+		if got != want {
+			t.Errorf("got %q want %q", got, want)
+		}
+	})
+}

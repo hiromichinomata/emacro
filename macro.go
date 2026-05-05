@@ -48,15 +48,18 @@ func applyMacroToLine(macro, line string) string {
 				i++
 			case "^N":
 				i++
-			case "^S":
-				searchWord := ""
-				for j := i + 2; j < len(macro); j++ {
-					if string(macro[j]) != "^" {
-						searchWord += string(macro[j])
-					} else {
-						break
-					}
+			case "^R":
+				searchWord := searchTermAfterCommand(macro, i)
+				prefix := line[:index]
+				last := strings.LastIndex(prefix, searchWord)
+				if last != -1 {
+					index = last
+					i += len(searchWord) + 1
+				} else {
+					i++
 				}
+			case "^S":
+				searchWord := searchTermAfterCommand(macro, i)
 				pos := strings.Index(line[index:], searchWord)
 				if pos != -1 {
 					index += pos + len(searchWord)
@@ -70,6 +73,19 @@ func applyMacroToLine(macro, line string) string {
 		}
 	}
 	return line
+}
+
+// searchTermAfterCommand reads the literal string after ^S or ^R up to the next '^' or EOF (same rule as Emacs-style forward search in this tool).
+func searchTermAfterCommand(macro string, i int) string {
+	var b strings.Builder
+	for j := i + 2; j < len(macro); j++ {
+		if macro[j] != '^' {
+			b.WriteByte(macro[j])
+		} else {
+			break
+		}
+	}
+	return b.String()
 }
 
 func convert(macro string, contents string) string {
