@@ -11,7 +11,7 @@ import (
 func main() {
 	argsCount := len(os.Args) - 1
 	if argsCount < 2 {
-		fmt.Fprintln(os.Stderr, "[usage] %s macro filename", os.Args[0])
+		fmt.Fprintf(os.Stderr, "[usage] %s macro filename\n", os.Args[0])
 		os.Exit(1)
 	}
 	macro := os.Args[1]
