@@ -37,7 +37,16 @@ Supported operations
 
 To input `^`, you can use `^^`
 
+`C-s` stops the macro for that line when the search fails (like Emacs).
+Unsupported operations are reported as an error.
+
+## Test
+
+```
+$ go test ./...
+```
+
 ## TODO
 * [ ] more operations
 * [ ] how to install
-* [ ] test
+* [x] test
