@@ -37,7 +37,8 @@ Macro syntax:
   ^A  C-a  beginning of line        ^E  C-e  end of line
   ^B  C-b  backward char            ^F  C-f  forward char
   ^D  C-d  delete char              ^?  DEL  delete backward char
-  ^K  C-k  kill to end of line      ^N  C-n  next line (no-op)
+  ^K  C-k  kill to end of line      ^Y  C-y  yank (paste killed text)
+  ^N  C-n  next line (no-op)
   ^S  C-s  search forward           ^R  C-r  search backward
   ^M  RET  end search word
   ^b  M-b  backward word            ^f  M-f  forward word
@@ -133,6 +134,7 @@ const (
 	opForwardWord
 	opBackwardWord
 	opKillWord
+	opYank
 )
 
 type op struct {
@@ -152,6 +154,7 @@ var simpleOps = map[rune]opKind{
 	'f': opForwardWord,
 	'b': opBackwardWord,
 	'd': opKillWord,
+	'Y': opYank,
 }
 
 // parse converts a macro string into a list of operations.
@@ -260,7 +263,19 @@ func runeIndex(rs, sub []rune, last bool) int {
 func apply(ops []op, line string) string {
 	rs := []rune(line)
 	index := 0
+	// The killed text is kept per line. Consecutive kills are appended,
+	// like Emacs.
+	var killed []rune
+	lastWasKill := false
+	kill := func(from, to int) {
+		if !lastWasKill {
+			killed = nil
+		}
+		killed = append(killed, rs[from:to]...)
+		rs = append(rs[:from], rs[to:]...)
+	}
 	for _, o := range ops {
+		isKill := o.kind == opKillLine || o.kind == opKillWord
 		switch o.kind {
 		case opInsert:
 			rs = append(rs[:index], append(append([]rune{}, o.text...), rs[index:]...)...)
@@ -287,7 +302,7 @@ func apply(ops []op, line string) string {
 				index++
 			}
 		case opKillLine:
-			rs = rs[:index]
+			kill(index, len(rs))
 		case opNextLine:
 			// Each line is processed independently, so this is a no-op.
 		case opSearchForward:
@@ -308,9 +323,12 @@ func apply(ops []op, line string) string {
 		case opBackwardWord:
 			index = backwardWord(rs, index)
 		case opKillWord:
-			end := forwardWord(rs, index)
-			rs = append(rs[:index], rs[end:]...)
+			kill(index, forwardWord(rs, index))
+		case opYank:
+			rs = append(rs[:index], append(append([]rune{}, killed...), rs[index:]...)...)
+			index += len(killed)
 		}
+		lastWasKill = isKill
 	}
 	return string(rs)
 }

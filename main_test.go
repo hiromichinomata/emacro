@@ -54,6 +54,14 @@ func TestApply(t *testing.T) {
 		{"kill word from middle", "^F^d", "foo bar", "f bar"},
 		{"kill word with separators", "^f^d", "foo, bar baz", "foo baz"},
 		{"word multibyte", "^fx", "日本語 abc", "日本語x abc"},
+		{"yank after kill line", "^S,^K^A^Y,", "a,b,c", "b,c,a,"},
+		{"yank after kill word", "^d^E ^Y", "foo bar", " bar foo"},
+		{"yank twice", "^d^Y^Y", "foo bar", "foofoo bar"},
+		{"yank without kill", "^Yx", "abc", "xabc"},
+		{"consecutive kills append", "^d^d^E^Y", "foo bar baz", " bazfoo bar"},
+		{"non-consecutive kills replace", "^d^F^d^E^Y", "foo bar baz", "  bazbar"},
+		{"yank multibyte", "^F^K^A^Y", "日本語", "本語日"},
+		{"kill is per line", "^Y", "abc", "abc"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

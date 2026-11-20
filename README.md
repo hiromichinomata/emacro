@@ -57,6 +57,7 @@ Supported operations
 | `^E` | `C-e` | end of line |
 | `^F` | `C-f` | forward char |
 | `^K` | `C-k` | kill to end of line |
+| `^Y` | `C-y` | yank (paste the last killed text) |
 | `^N` | `C-n` | next line (no-op, each line is processed independently) |
 | `^R` | `C-r` | search backward |
 | `^S` | `C-s` | search forward |
@@ -71,6 +72,11 @@ Search
 * The search word continues until the next operation, or until `^M` (`RET`), which ends it. Use `^M` to insert text right after a search.
 * `^^` in a search word matches a literal `^`.
 * When the search fails, the rest of the macro is skipped for that line (like Emacs).
+
+Kill and yank
+
+* `^K` and `^d` kill text, and `^Y` yanks it. Consecutive kills are appended (like Emacs).
+* Killed text is kept per line; it is not carried over to the next line.
 
 Unsupported operations are reported as an error.
 
