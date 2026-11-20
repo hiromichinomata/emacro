@@ -1,7 +1,19 @@
 # emacro
 Use Emacs macro like grep
 
+## Install
+
+```
+$ go install github.com/hiromichinomata/emacro@latest
+```
+
 ## Usage
+
+```
+emacro [options] MACRO [FILE...]
+```
+
+The macro is applied to each line independently. With no FILE, or when FILE is `-`, standard input is read.
 
 ```
 $ cat test/sample.csv
@@ -17,27 +29,49 @@ $ emacro '^S,user^D^D' test/sample.csv
 2020-04-01 02:34,user,female,27
 2020-04-01 03:45,user,male,37
 
+$ cat test/sample.csv | emacro '^S,user^Mname_'
+2020-04-01 01:23,username_01,male,17
+2020-04-01 02:34,username_02,female,27
+2020-04-01 03:45,username_03,male,37
 ```
+
+Options
+
+* `-h`, `--help`: show help
+* `-v`, `--version`: show version
 
 ## Doc
 Basic
 
 * `^A` => `C-a`
 * `^a` => `M-a`
+* `^^` => `^` (literal)
 
 Supported operations
 
-* `C-a`
-* `C-b`
-* `C-d`
-* `C-e`
-* `C-f`
-* `C-n`
-* `C-s`
+| Macro | Key | Description |
+| --- | --- | --- |
+| `^A` | `C-a` | beginning of line |
+| `^B` | `C-b` | backward char |
+| `^D` | `C-d` | delete char |
+| `^E` | `C-e` | end of line |
+| `^F` | `C-f` | forward char |
+| `^K` | `C-k` | kill to end of line |
+| `^N` | `C-n` | next line (no-op, each line is processed independently) |
+| `^R` | `C-r` | search backward |
+| `^S` | `C-s` | search forward |
+| `^M` | `RET` | end search word |
+| `^?` | `DEL` | delete backward char |
+| `^b` | `M-b` | backward word |
+| `^d` | `M-d` | kill word |
+| `^f` | `M-f` | forward word |
 
-To input `^`, you can use `^^`
+Search
 
-`C-s` stops the macro for that line when the search fails (like Emacs).
+* The search word continues until the next operation, or until `^M` (`RET`), which ends it. Use `^M` to insert text right after a search.
+* `^^` in a search word matches a literal `^`.
+* When the search fails, the rest of the macro is skipped for that line (like Emacs).
+
 Unsupported operations are reported as an error.
 
 ## Test
@@ -48,5 +82,5 @@ $ go test ./...
 
 ## TODO
 * [ ] more operations
-* [ ] how to install
+* [x] how to install
 * [x] test

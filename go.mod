@@ -1,3 +1,3 @@
-module emacro
+module github.com/hiromichinomata/emacro
 
-go 1.14
+go 1.21
