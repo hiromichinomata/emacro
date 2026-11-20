@@ -10,7 +10,7 @@ $ go install github.com/hiromichinomata/emacro@latest
 ## Usage
 
 ```
-emacro [options] MACRO [FILE...]
+emacro [options] [--] MACRO [FILE...]
 ```
 
 The macro is applied to each line independently. With no FILE, or when FILE is `-`, standard input is read.
@@ -39,6 +39,10 @@ Options
 
 * `-h`, `--help`: show help
 * `-v`, `--version`: show version
+* `--strict`: follow Emacs strictly (see [Strict mode](#strict-mode))
+* `--`: end of options
+
+Options must come before MACRO. Only arguments that exactly match an option are treated as options, so a macro starting with `-` works as is (e.g. `emacro '- ' notes.txt`). Use `--` when the macro itself is one of the options (e.g. `emacro -- -h file`).
 
 ## Doc
 Basic
@@ -69,16 +73,36 @@ Supported operations
 
 Search
 
-* The search word continues until the next operation, or until `^M` (`RET`), which ends it. Use `^M` to insert text right after a search.
-* `^^` in a search word matches a literal `^`.
-* When the search fails, the rest of the macro is skipped for that line (like Emacs).
+* The search word continues until the next `^`. `^M` (`RET`) ends the search word; use it to insert text right after a search (e.g. `^S,user^Mname_`).
+* When the search fails, the search word is inserted at the cursor and the macro continues (v0.1.0 compatible). With `--strict`, the rest of the macro is skipped for that line (like Emacs).
 
 Kill and yank
 
 * `^K` and `^d` kill text, and `^Y` yanks it. Consecutive kills are appended (like Emacs).
 * Killed text is kept per line; it is not carried over to the next line.
 
-Unsupported operations are reported as an error.
+Unsupported operations
+
+* `^X` that is not a supported operation inserts `X` (v0.1.0 compatible). With `--strict`, it is reported as an error.
+
+Strict mode
+
+By default, emacro keeps compatibility with v0.1.0. `--strict` follows Emacs more strictly:
+
+| | default | `--strict` |
+| --- | --- | --- |
+| failed search (`^S`, `^R`) | insert the search word and continue | skip the rest of the macro for the line |
+| unsupported operation `^X` | insert `X` | error (exit status 2) |
+
+Exit status
+
+* `0`: success
+* `1`: usage error, or a file could not be read
+* `2`: invalid macro
+
+Encoding
+
+Input is processed as UTF-8. Bytes that are not valid UTF-8 are kept as they are, and each such byte is treated as one character.
 
 ## Test
 

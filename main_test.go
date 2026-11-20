@@ -8,6 +8,17 @@ import (
 	"testing"
 )
 
+func applyMacro(t *testing.T, macro, line string, strict bool) string {
+	t.Helper()
+	ops, err := parse(macro, strict)
+	if err != nil {
+		t.Fatalf("parse(%q) error: %v", macro, err)
+	}
+	m := &machine{ops: ops, strict: strict}
+	return m.apply(line)
+}
+
+// Cases that behave the same with and without --strict.
 func TestApply(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -26,20 +37,18 @@ func TestApply(t *testing.T) {
 		{"delete last char", "^E^B^D", "ab", "a"},
 		{"next line is noop", "^Fx^N^Fy", "abc", "axbyc"},
 		{"caret insert advances cursor", "^^x", "ab", "^xab"},
-		{"search failure aborts macro", "^Sfoo^Dx", "abc", "abc"},
-		{"search failure keeps earlier edits", "x^Sfoo^Dy", "abc", "xabc"},
 		{"search from cursor", "^Sa^Sa^Dx", "aaab", "aaxb"},
+		{"empty search word", "^S^Dx", "abc", "xbc"},
 		{"multibyte forward", "^Fx", "あいう", "あxいう"},
 		{"multibyte delete", "^F^D", "あいう", "あう"},
 		{"multibyte search", "^Sい^D", "あいうえ", "あいえ"},
 		{"multibyte insert", "日本", "abc", "日本abc"},
 		{"empty line", "^E^Dx", "", "x"},
 		{"search ended by RET then insert", "^S,user^Mx", "a,user01", "a,userx01"},
-		{"search word with literal caret", "^Sa^^b^M^Dx", "1a^bcd", "1a^bxd"},
+		{"caret ends search word", "^Sa^^b", "1a2", "1a^b2"},
 		{"search then other op ends word", "^Sab^Bx", "zabc", "zaxbc"},
 		{"search backward", "^E^R,^Dx", "a,b,c", "a,bxc"},
 		{"search backward from cursor", "^E^R,^R,^Dx", "a,b,c", "axb,c"},
-		{"search backward failure aborts", "^E^Rz^Dx", "abc", "abc"},
 		{"search backward with RET", "^E^R,^Mx", "a,b", "ax,b"},
 		{"kill line", "^F^K", "abc", "a"},
 		{"kill line at end", "^E^K", "abc", "abc"},
@@ -61,27 +70,94 @@ func TestApply(t *testing.T) {
 		{"consecutive kills append", "^d^d^E^Y", "foo bar baz", " bazfoo bar"},
 		{"non-consecutive kills replace", "^d^F^d^E^Y", "foo bar baz", "  bazbar"},
 		{"yank multibyte", "^F^K^A^Y", "日本語", "本語日"},
-		{"kill is per line", "^Y", "abc", "abc"},
+		{"invalid utf-8 is kept", "^E^Bx", "a\xffb\xfe", "a\xffbx\xfe"},
+		{"invalid utf-8 delete", "^F^D", "a\xff\xfeb", "a\xfeb"},
+		{"invalid utf-8 search", "^S\xff^Dx", "a\xffbc", "a\xffxc"},
+		{"invalid utf-8 is not a word char", "^fx", "ab\xffcd", "abx\xffcd"},
+		{"truncated multibyte is kept", "^Ex", "あ\xe3\x81", "あ\xe3\x81x"},
+	}
+	for _, tt := range tests {
+		for _, strict := range []bool{false, true} {
+			name := tt.name
+			if strict {
+				name += "/strict"
+			}
+			t.Run(name, func(t *testing.T) {
+				if got := applyMacro(t, tt.macro, tt.line, strict); got != tt.want {
+					t.Errorf("apply(%q, %q) = %q, want %q", tt.macro, tt.line, got, tt.want)
+				}
+			})
+		}
+	}
+}
+
+// Cases where v0.1.0 compatible mode and --strict differ.
+func TestApplyCompatAndStrict(t *testing.T) {
+	tests := []struct {
+		name   string
+		macro  string
+		line   string
+		compat string
+		strict string
+	}{
+		{"search failure", "^Sfoo^Dx", "abc", "fooxbc", "abc"},
+		{"search failure keeps earlier edits", "x^Sfoo^Dy", "abc", "xfooybc", "xabc"},
+		{"search failure with RET", "^Sfoo^Mx", "abc", "fooxabc", "abc"},
+		{"search backward failure", "^E^Rz^Dx", "abc", "abczx", "abc"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ops, err := parse(tt.macro)
-			if err != nil {
-				t.Fatalf("parse(%q) error: %v", tt.macro, err)
+			if got := applyMacro(t, tt.macro, tt.line, false); got != tt.compat {
+				t.Errorf("compat: apply(%q, %q) = %q, want %q", tt.macro, tt.line, got, tt.compat)
 			}
-			if got := apply(ops, tt.line); got != tt.want {
-				t.Errorf("apply(%q, %q) = %q, want %q", tt.macro, tt.line, got, tt.want)
+			if got := applyMacro(t, tt.macro, tt.line, true); got != tt.strict {
+				t.Errorf("strict: apply(%q, %q) = %q, want %q", tt.macro, tt.line, got, tt.strict)
 			}
 		})
 	}
 }
 
-func TestParseError(t *testing.T) {
-	for _, macro := range []string{"^", "abc^", "^Z", "^x", "^M", "x^M"} {
-		if _, err := parse(macro); err == nil {
-			t.Errorf("parse(%q) expected error", macro)
+func TestUnsupportedOperation(t *testing.T) {
+	// v0.1.0 compatible: '^X' inserts 'X'.
+	tests := []struct {
+		macro, line, want string
+	}{
+		{"^Z", "abc", "Zabc"},
+		{"^x^Fy", "abc", "xaybc"},
+		{"^M", "abc", "Mabc"},
+	}
+	for _, tt := range tests {
+		if got := applyMacro(t, tt.macro, tt.line, false); got != tt.want {
+			t.Errorf("apply(%q, %q) = %q, want %q", tt.macro, tt.line, got, tt.want)
+		}
+		if _, err := parse(tt.macro, true); err == nil {
+			t.Errorf("strict: parse(%q) expected error", tt.macro)
 		}
 	}
+}
+
+func TestParseError(t *testing.T) {
+	for _, strict := range []bool{false, true} {
+		for _, macro := range []string{"^", "abc^", "^Sa^"} {
+			if _, err := parse(macro, strict); err == nil {
+				t.Errorf("parse(%q, strict=%v) expected error", macro, strict)
+			}
+		}
+	}
+}
+
+func runMacro(t *testing.T, macro, input string) string {
+	t.Helper()
+	ops, err := parse(macro, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &machine{ops: ops}
+	var buf bytes.Buffer
+	if err := m.run(strings.NewReader(input), &buf); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
 }
 
 func TestRun(t *testing.T) {
@@ -95,32 +171,35 @@ func TestRun(t *testing.T) {
 		{"crlf", "user01\r\nuser02\r\n", "user\r\nuser\r\n"},
 		{"empty", "", ""},
 	}
-	ops, err := parse("^Suser^D^D")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			if err := run(ops, strings.NewReader(tt.input), &buf); err != nil {
-				t.Fatal(err)
-			}
-			if got := buf.String(); got != tt.want {
+			if got := runMacro(t, "^Suser^D^D", tt.input); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
+func TestRunKillIsPerLine(t *testing.T) {
+	if got, want := runMacro(t, "^Y^K", "abc\ndef\n"), "\n\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got, want := runMacro(t, "^Y^F^K", "abc\ndef\n"), "a\nd\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestRunLongLine(t *testing.T) {
 	long := strings.Repeat("a", 100000)
-	ops, _ := parse("^Ex")
-	var buf bytes.Buffer
-	if err := run(ops, strings.NewReader(long+"\n"), &buf); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := buf.String(), long+"x\n"; got != want {
+	if got, want := runMacro(t, "^Ex", long+"\n"), long+"x\n"; got != want {
 		t.Errorf("long line not handled: got len %d, want len %d", len(got), len(want))
+	}
+}
+
+func TestRunInvalidUTF8(t *testing.T) {
+	input := "\x82\xa0\x82\xa2\n" // "あい" in Shift_JIS
+	if got, want := runMacro(t, "^E!", input), "\x82\xa0\x82\xa2!\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 
@@ -143,42 +222,38 @@ func TestCLI(t *testing.T) {
 	}
 	macro := "^Suser^D^D"
 
-	t.Run("stdin", func(t *testing.T) {
-		out, _, code := runCLI(t, "user01\n", macro)
-		if code != 0 || out != "user\n" {
-			t.Errorf("got %q (code %d)", out, code)
-		}
-	})
-	t.Run("dash is stdin", func(t *testing.T) {
-		out, _, code := runCLI(t, "userXX\n", macro, a, "-", b)
-		if code != 0 || out != "user\nuser\nuser\n" {
-			t.Errorf("got %q (code %d)", out, code)
-		}
-	})
-	t.Run("multiple files", func(t *testing.T) {
-		out, _, code := runCLI(t, "", macro, a, b)
-		if code != 0 || out != "user\nuser\n" {
-			t.Errorf("got %q (code %d)", out, code)
-		}
-	})
-	t.Run("missing file continues", func(t *testing.T) {
-		out, errOut, code := runCLI(t, "", macro, a, filepath.Join(dir, "none"), b)
-		if code != 1 || out != "user\nuser\n" || errOut == "" {
-			t.Errorf("got %q, stderr %q (code %d)", out, errOut, code)
-		}
-	})
-	t.Run("invalid macro", func(t *testing.T) {
-		_, errOut, code := runCLI(t, "", "abc^", a)
-		if code != 2 || errOut == "" {
-			t.Errorf("stderr %q (code %d)", errOut, code)
-		}
-	})
-	t.Run("no args", func(t *testing.T) {
-		_, errOut, code := runCLI(t, "")
-		if code != 2 || !strings.Contains(errOut, "Usage") {
-			t.Errorf("stderr %q (code %d)", errOut, code)
-		}
-	})
+	tests := []struct {
+		name       string
+		stdin      string
+		args       []string
+		wantOut    string
+		wantCode   int
+		wantStderr bool
+	}{
+		{"stdin", "user01\n", []string{macro}, "user\n", 0, false},
+		{"dash is stdin", "userXX\n", []string{macro, a, "-", b}, "user\nuser\nuser\n", 0, false},
+		{"multiple files", "", []string{macro, a, b}, "user\nuser\n", 0, false},
+		{"missing file continues", "", []string{macro, a, filepath.Join(dir, "none"), b}, "user\nuser\n", 1, true},
+		{"invalid macro", "", []string{"abc^", a}, "", 2, true},
+		{"no args", "", nil, "", 1, true},
+		{"macro starting with dash", "abc\n", []string{"- "}, "- abc\n", 0, false},
+		{"macro that looks like a flag", "abc\n", []string{"-x"}, "-xabc\n", 0, false},
+		{"double dash", "abc\n", []string{"--", "-h"}, "-habc\n", 0, false},
+		{"compat by default", "abc\n", []string{"^Sfoo^Dx"}, "fooxbc\n", 0, false},
+		{"strict", "abc\n", []string{"--strict", "^Sfoo^Dx"}, "abc\n", 0, false},
+		{"strict invalid macro", "abc\n", []string{"--strict", "^Z"}, "", 2, true},
+		{"strict with double dash", "abc\n", []string{"--strict", "--", "-^Sz^Dx"}, "-abc\n", 0, false},
+		{"options only before macro", "", []string{"x", "--strict"}, "", 1, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, errOut, code := runCLI(t, tt.stdin, tt.args...)
+			if out != tt.wantOut || code != tt.wantCode || (errOut != "") != tt.wantStderr {
+				t.Errorf("got %q, stderr %q, code %d; want %q, code %d", out, errOut, code, tt.wantOut, tt.wantCode)
+			}
+		})
+	}
+
 	for _, f := range []string{"-h", "--help"} {
 		t.Run(f, func(t *testing.T) {
 			out, _, code := runCLI(t, "", f)
@@ -195,10 +270,4 @@ func TestCLI(t *testing.T) {
 			}
 		})
 	}
-	t.Run("unknown flag", func(t *testing.T) {
-		_, _, code := runCLI(t, "", "-x")
-		if code != 2 {
-			t.Errorf("code %d", code)
-		}
-	})
 }
