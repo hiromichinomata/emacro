@@ -218,6 +218,16 @@ func TestRunInvalidUTF8(t *testing.T) {
 
 // Tests from v0.2.0. They must keep passing for compatibility.
 
+// convert applies macro to every line of contents in the default
+// (v0.2.0 compatible) mode.
+func convert(macro string, contents string) string {
+	ops, _ := parse(macro, false) // never fails without strict
+	m := &machine{ops: ops}
+	var b strings.Builder
+	_ = m.run(strings.NewReader(contents), &b)
+	return b.String()
+}
+
 func Test_convert_readmeExample(t *testing.T) {
 	sample := "" +
 		"2020-04-01 01:23,user01,male,17\n" +

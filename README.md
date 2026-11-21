@@ -133,5 +133,3 @@ Input is processed as UTF-8. Bytes that are not valid UTF-8 (e.g. Shift_JIS text
 ```console
 go test ./...
 ```
-
-CI runs `go test` on push and pull request ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).

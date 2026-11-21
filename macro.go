@@ -340,13 +340,3 @@ func (m *machine) run(r io.Reader, w io.Writer) error {
 		}
 	}
 }
-
-// convert applies macro to every line of contents in the default
-// (v0.2.0 compatible) mode.
-func convert(macro string, contents string) string {
-	ops, _ := parse(macro, false) // never fails without strict
-	m := &machine{ops: ops}
-	var b strings.Builder
-	_ = m.run(strings.NewReader(contents), &b)
-	return b.String()
-}
