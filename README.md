@@ -2,7 +2,7 @@
 
 Transform each line of a file with Emacs-style key sequences—useful for quick line-oriented edits in the same way you might use `grep` for line-oriented **filtering**.
 
-The macro language supports movement, search, line/word editing, and literal insertion. Processing is **one line at a time**; the cursor is **byte-based** (ASCII / UTF-8 multibyte lines are not fully “character-aware” for all operations).
+The macro language supports movement, search, line/word editing, kill/yank, and literal insertion. Processing is **one line at a time**, and the cursor moves **one character (UTF-8) at a time**.
 
 ## Requirements
 
@@ -10,35 +10,36 @@ The macro language supports movement, search, line/word editing, and literal ins
 
 ## Install
 
+```console
+go install github.com/hiromichinomata/emacro@latest
+```
+
 From a clone of this repository:
 
 ```console
 go build -o emacro .
 ```
 
-To install the binary onto your `PATH` (from the module root):
-
-```console
-go install
-```
-
-If the module is published under a full import path (for example `github.com/yourname/emacro`), you can also use:
-
-```console
-go install github.com/yourname/emacro@latest
-```
-
-(after setting the `module` line in `go.mod` to match that path).
-
 ## Usage
 
 ```console
-emacro <macro> <file> [file...]
+emacro [options] [--] <macro> [file...]
 ```
 
-- **Multiple files:** read in order; output is the concatenation of each file’s transformed lines (no filename headers).
-- **Standard input:** use `-` as a file name.
-- **Help:** `emacro -h` or `emacro --help`.
+- **Multiple files:** read in order; output is the concatenation of each file's transformed lines (no filename headers).
+- **Standard input:** read when no file is given, or when `-` is given as a file name.
+- **Line endings:** LF and CRLF are kept as they are.
+
+### Options
+
+| Option | Effect |
+|--------|--------|
+| `-h`, `--help` | Show help |
+| `-v`, `--version` | Show version |
+| `--strict` | Follow Emacs strictly (see [Strict mode](#strict-mode)) |
+| `--` | End of options |
+
+Options must come **before** the macro. Only arguments that exactly match an option are treated as options, so a macro starting with `-` works as is (e.g. `emacro '- ' notes.txt`). Use `--` when the macro itself is one of the options (e.g. `emacro -- -h file`).
 
 ### Example
 
@@ -58,38 +59,35 @@ $ emacro '^S,user^D^D' test/sample.csv
 ```
 
 ```console
-$ cat test/sample.csv | emacro '^S,user^D^D' -
-2020-04-01 01:23,user,male,17
-2020-04-01 02:34,user,female,27
-2020-04-01 03:45,user,male,37
+$ cat test/sample.csv | emacro '^S,user^Mname_'
+2020-04-01 01:23,username_01,male,17
+2020-04-01 02:34,username_02,female,27
+2020-04-01 03:45,username_03,male,37
 ```
 
 ## Macro reference
 
-### Control (two bytes: `^` + letter)
+### Control (`^` + character)
 
 | Sequence | Binding | Effect |
 |----------|---------|--------|
 | `^A` | `C-a` | Move to beginning of line |
 | `^B` | `C-b` | Move backward one character |
-| `^D` | `C-d` | Delete character under cursor (or one before end of line) |
+| `^D` | `C-d` | Delete character under cursor |
 | `^E` | `C-e` | Move to end of line |
 | `^F` | `C-f` | Move forward one character |
-| `^K` | `C-k` | Kill line: delete from cursor through end of line |
+| `^K` | `C-k` | Kill from cursor through end of line |
+| `^Y` | `C-y` | Yank (insert the last killed text) |
 | `^N` | `C-n` | No-op (each line is processed separately) |
 | `^S` | `C-s` | Forward search: move cursor **past** the next match (see below) |
 | `^R` | `C-r` | Backward search: move cursor to the **start** of the last match **before** the current position (see below) |
+| `^M` | `RET` | End a search word (see below) |
+| `^?` | `DEL` | Delete character before cursor |
 | `^^` | — | Insert a literal `^` |
 
-Any other character is **inserted** at the cursor; the cursor advances one byte.
+Any other character is **inserted** at the cursor; the cursor advances one character.
 
-### Search terms (`^S` / `^R`)
-
-The search string begins **after** `^S` or `^R` and ends at the **next `^`** in the macro, or at end of macro. To avoid swallowing the rest of the macro (for example before inserting text), **terminate the term with a harmless command** such as `^N` before further letters—e.g. `^E^R,user^NX` if you need a literal `X` after a `^R,user` search.
-
-If the search **fails**, the engine only advances the macro by one step (same idea as the original `^S` behavior), so the following bytes may be interpreted differently than after a successful search.
-
-### Meta (three bytes: `^` + `m` + letter)
+### Meta (`^m` + character)
 
 | Sequence | Binding | Effect |
 |----------|---------|--------|
@@ -97,17 +95,41 @@ If the search **fails**, the engine only advances the macro by one step (same id
 | `^mb` | `M-b` | Backward one **word** |
 | `^md` | `M-d` | Kill **forward** from cursor through end of next word |
 
-A **word** is a maximal run of ASCII letters, digits, or `_`.
+A **word** is a maximal run of letters, digits, or `_` (including non-ASCII letters such as Japanese).
 
-### Notes
+### Search terms (`^S` / `^R`)
 
-- Unknown two-byte sequences like `^Z` advance by one byte in the macro stream (the `^` is skipped in that step).
-- Multibyte UTF-8 characters are easiest to reason about when lines stay ASCII; byte indexing can split Unicode code points.
+The search string begins **after** `^S` or `^R` and ends at the **next `^`** in the macro, or at end of macro. To insert text right after a search, end the term with `^M` (`RET`), e.g. `^S,user^Mname_`. (`^N` also works as a terminator, as in v0.2.0.)
+
+If the search **fails**, the search term is inserted at the cursor and the macro continues (v0.1.0 / v0.2.0 compatible). With `--strict`, the rest of the macro is skipped for that line (like Emacs).
+
+### Kill and yank
+
+- `^K` and `^md` kill text, and `^Y` yanks it. Consecutive kills are appended (like Emacs).
+- Killed text is kept per line; it is not carried over to the next line.
+
+### Strict mode
+
+By default, emacro keeps compatibility with v0.2.0. `--strict` follows Emacs more strictly:
+
+| | default | `--strict` |
+|---|---|---|
+| Failed search (`^S`, `^R`) | Insert the search term and continue | Skip the rest of the macro for the line |
+| Unsupported sequence like `^Z` | Ignored | Error (exit status 2) |
+| Trailing `^` | Ignored | Error (exit status 2) |
+
+### Exit status
+
+- `0`: success
+- `1`: usage error, or a file could not be read
+- `2`: invalid macro (only with `--strict`)
+
+### Encoding
+
+Input is processed as UTF-8. Bytes that are not valid UTF-8 (e.g. Shift_JIS text) are kept as they are, and each such byte is treated as one character.
 
 ## Development
 
 ```console
 go test ./...
 ```
-
-CI runs `go test` on push and pull request ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
